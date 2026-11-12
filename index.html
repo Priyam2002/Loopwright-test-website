@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loopwright — Work that runs itself.</title>
+  <meta name="description" content="Loopwright designs, builds and runs AI agents and workflow automations for operations teams, so the repetitive work happens without anyone touching it.">
+  <meta name="theme-color" content="#F6F4EE">
+  <script>document.documentElement.classList.add('js');</script>
+  <link rel="icon" type="image/svg+xml" href="brand_assets/logo/loopwright-app-icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { ink:'#12141C', paper:'#F6F4EE', ember:{ DEFAULT:'#FF5B2E', deep:'#B83A14', tint:'#FFE3D9' }, graphite:'#4A4E5A', fog:'#E4E1D8', moss:'#2E7D6B' },
+        fontFamily: { display:['"Space Grotesk"','Arial','sans-serif'], sans:['Inter','system-ui','sans-serif'], mono:['"JetBrains Mono"','ui-monospace','monospace'] }
+      } }
+    };
+  </script>
+  <style>
+    :root{
+      --ink:#12141C; --ink-2:#1C1F2A; --paper:#F6F4EE; --ember:#FF5B2E; --ember-deep:#B83A14; --tint:#FFE3D9;
+      --graphite:#4A4E5A; --fog:#E4E1D8; --moss:#2E7D6B; --white:#FFFFFF; --night:#2A130A;
+      --ease:cubic-bezier(.2,.7,.2,1); --spring:cubic-bezier(.34,1.4,.5,1);
+      --shadow:0 1px 2px rgba(18,20,28,.06),0 8px 24px rgba(18,20,28,.06);
+      --shadow-float:0 2px 4px rgba(18,20,28,.06),0 18px 44px rgba(18,20,28,.14);
+      --frame:1296px;
+      --grain:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--paper);color:var(--ink);font-family:Inter,system-ui,sans-serif;font-size:16px;line-height:1.625;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    ::selection{background:var(--tint);color:var(--ink)}
+    .skip{position:absolute;left:16px;top:-60px;z-index:100;background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:12px}
+    .skip:focus{top:12px}
+
+    /* ---------- type ---------- */
+    .t-display{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:44px;line-height:48px;letter-spacing:-.03em}
+    .t-h1{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:36px;line-height:40px;letter-spacing:-.025em}
+    .t-h2{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:30px;line-height:36px;letter-spacing:-.02em}
+    .t-h3{font-family:"Space Grotesk",sans-serif;font-weight:500;font-size:22px;line-height:28px;letter-spacing:-.01em}
+    .t-lead{font-size:18px;line-height:28px}
+    .t-body{font-size:16px;line-height:26px}
+    .t-small{font-size:14px;line-height:22px;font-weight:500}
+    .t-label{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:12px;line-height:16px;letter-spacing:.08em;text-transform:uppercase}
+    @media (min-width:1024px){
+      .t-display{font-size:76px;line-height:80px}
+      .t-h1{font-size:56px;line-height:60px}
+      .t-h2{font-size:40px;line-height:46px}
+      .t-h3{font-size:26px;line-height:32px}
+      .t-lead{font-size:20px;line-height:32px}
+      .t-body{font-size:17px;line-height:28px}
+    }
+    .muted{color:var(--graphite)}
+
+    /* ---------- icons ---------- */
+    .ic{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+    .ic-sm{width:16px;height:16px}
+    .ic-xs{width:14px;height:14px}
+
+    /* ---------- buttons ---------- */
+    .btn{position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:14px 22px;border-radius:12px;font-family:Inter,sans-serif;font-weight:600;font-size:15px;line-height:20px;white-space:nowrap;cursor:pointer;transition:transform .25s var(--spring)}
+    .btn::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:var(--ink);opacity:0;transition:opacity .2s var(--ease)}
+    .btn .arr{transition:transform .25s var(--spring)}
+    .btn:hover .arr{transform:translateX(2px)}
+    .btn:hover::before{opacity:.06}
+    .btn:active{transform:scale(.97)}
+    .btn:focus-visible{outline:2px solid var(--ember-deep);outline-offset:3px}
+    .btn-sm{padding:9px 14px;font-size:14px;gap:6px}
+    .btn-primary{background:var(--ember);color:var(--ink)}
+    .btn-secondary{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+    .btn-ink{background:var(--ink);color:var(--paper)}
+    .btn-ink::before{background:var(--paper)}
+    .btn-ink:hover::before{opacity:.1}
+    .btn-paper{background:var(--paper);color:var(--ink)}
+    .btn-ghost-dark{color:var(--paper);background:rgba(246,244,238,.08);box-shadow:inset 0 0 0 1px rgba(246,244,238,.22)}
+    .btn-ghost-dark::before{background:var(--paper)}
+    .btn-ghost-dark:hover::before{opacity:.08}
+    .btn-ghost-dark:focus-visible,.btn-paper:focus-visible{outline-color:var(--tint)}
+
+    .link{color:var(--ember-deep);text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;border-radius:4px}
+    .link:hover{text-decoration-thickness:2px}
+    .link:focus-visible{outline:2px solid var(--ember-deep);outline-offset:2px}
+    .link:active{opacity:.7}
+
+    /* ---------- frame (vertical guide lines like the reference) ---------- */
+    .frame{max-width:var(--frame);margin-inline:auto;position:relative}
+    @media (min-width:1024px){ .frame-lines{border-inline:1px solid var(--fog)} }
+    .rule{border-top:1px solid var(--fog)}
+
+    /* ---------- announcement + nav ---------- */
+    .announce{background:var(--ink);color:rgba(246,244,238,.82)}
+    .announce a{color:var(--paper)}
+    .nav{position:sticky;top:0;z-index:50;background:rgba(246,244,238,.88);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--fog)}
+    .nav-link{display:inline-flex;align-items:center;gap:4px;padding:8px 12px;border-radius:12px;font-weight:500;font-size:15px;color:var(--ink);cursor:pointer}
+    .nav-link .ic{transition:transform .25s var(--ease)}
+    .nav-link:hover{color:var(--ember-deep)}
+    .nav-link:focus-visible{outline:2px solid var(--ember-deep);outline-offset:1px}
+    .nav-link:active{opacity:.7}
+    .dd{position:relative}
+    .dd-panel{position:absolute;left:0;top:calc(100% + 8px);min-width:300px;background:var(--white);border-radius:12px;box-shadow:0 0 0 1px var(--fog),var(--shadow-float);padding:8px;opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .2s var(--ease),transform .25s var(--ease)}
+    .dd-panel::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}
+    .dd:hover .dd-panel,.dd:focus-within .dd-panel,.dd.open .dd-panel{opacity:1;transform:none;pointer-events:auto}
+    .dd:hover .nav-link .ic,.dd.open .nav-link .ic{transform:rotate(180deg)}
+    .dd-item{display:block;padding:10px 12px;border-radius:8px}
+    .dd-item b{display:block;font-weight:600;font-size:15px}
+    .dd-item span{display:block;font-size:13px;line-height:20px;color:var(--graphite)}
+    .dd-item:hover{background:var(--paper)}
+    .dd-item:focus-visible{outline:2px solid var(--ember-deep);outline-offset:-2px}
+    .dd-item:active{background:var(--tint)}
+    .menu-btn{border-radius:12px}
+    .menu-btn:hover{background:rgba(18,20,28,.05)}
+    .menu-btn:focus-visible{outline:2px solid var(--ember-deep)}
+    .menu-btn:active{transform:scale(.95)}
+
+    /* the Node travels the Loop once on load */
+    .node{transform-box:view-box;transform-origin:32px 32px;animation:orbit 1.6s var(--ease) .3s both}
+    @keyframes orbit{from{transform:rotate(-360deg)}to{transform:rotate(0)}}
+
+    /* ---------- hero ---------- */
+    .hero{position:relative;overflow:hidden}
+    .stripes{position:absolute;inset:0 0 auto auto;width:min(1100px,92vw);height:560px;display:flex;justify-content:flex-end;pointer-events:none;
+      -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 45%);mask-image:linear-gradient(90deg,transparent 0%,#000 45%)}
+    .stripes i{flex:1;background:linear-gradient(180deg,rgba(255,227,217,0) 0%,rgba(255,227,217,.55) calc(var(--s) * 1%),rgba(255,91,46,var(--a)) calc(var(--s) * 1% + 22%),rgba(255,140,100,.18) 92%,rgba(255,227,217,0) 100%)}
+    .hero-glow{position:absolute;inset:0;pointer-events:none;background:
+      radial-gradient(40% 35% at 85% 30%,rgba(255,91,46,.10),transparent 70%),
+      radial-gradient(30% 30% at 60% 0%,rgba(255,227,217,.6),transparent 70%)}
+    .grain::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:var(--grain);opacity:.07;mix-blend-mode:multiply}
+
+    .mock-wrap{position:relative;z-index:2}
+    .mock-band{position:absolute;left:0;right:0;bottom:-1px;height:200px;display:flex;pointer-events:none;
+      -webkit-mask-image:linear-gradient(90deg,transparent 0%,#000 12%,#000 88%,transparent 100%);mask-image:linear-gradient(90deg,transparent 0%,#000 12%,#000 88%,transparent 100%)}
+    .mock-band i{flex:1;background:linear-gradient(180deg,rgba(255,91,46,var(--a)) 0%,rgba(255,180,150,.35) 70%,rgba(246,244,238,0) 100%)}
+    .mock{position:relative;background:var(--white);border-radius:20px;box-shadow:0 0 0 1px var(--fog),0 0 0 6px rgba(255,255,255,.55),0 2px 4px rgba(18,20,28,.05),0 30px 70px -20px rgba(184,58,20,.22);overflow:hidden}
+    .mock-tabs{display:flex;overflow-x:auto;scrollbar-width:none;background:#FBFAF7;border-bottom:1px solid var(--fog)}
+    .mock-tabs::-webkit-scrollbar{display:none}
+    .mtab{flex:1 0 auto;display:flex;align-items:center;gap:8px;padding:14px 18px;border-right:1px solid var(--fog);color:var(--graphite);cursor:pointer;position:relative}
+    .mtab:last-child{border-right:0}
+    .mtab::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--tint);opacity:0}
+    .mtab[aria-selected="true"]{background:var(--white);color:var(--ink)}
+    .mtab[aria-selected="true"]::after{opacity:1}
+    .mtab .prog{position:absolute;left:0;right:0;bottom:-1px;z-index:1;height:2px;background:var(--ember);transform:scaleX(0);transform-origin:left}
+    .mtab[aria-selected="true"] .prog{transform:scaleX(1)}
+    .mock.auto .mtab[aria-selected="true"] .prog{animation:tabProg 10s linear both}
+    .mock.hold .mtab .prog,.mock.off .mtab .prog{animation-play-state:paused}
+    .mtab:hover{color:var(--ink)}
+    .mtab:focus-visible{outline:2px solid var(--ember-deep);outline-offset:-3px}
+    .mtab:active{opacity:.75}
+    .mock-body{display:grid;grid-template-columns:minmax(0,1fr);min-height:520px}
+    @media (min-width:768px){.mock-body{grid-template-columns:340px minmax(0,1fr)}}
+    @media (min-width:1100px){.mock-body{grid-template-columns:360px 230px minmax(0,1fr)}}
+    .wrow{grid-template-columns:minmax(0,1fr)}
+    @media (min-width:1024px){.wrow{grid-template-columns:minmax(0,1fr) minmax(0,604px)}}
+    .mcol{border-right:1px solid var(--fog)}
+    .mcol:last-child{border-right:0}
+    .swap{animation:swap .45s var(--ease) both}
+    @keyframes swap{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .bubble{background:var(--tint);border-radius:12px;padding:12px 14px;font-size:14px;line-height:21px}
+    .thinking{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ember-deep)}
+    .thinking .dotp{width:8px;height:8px;border-radius:99px;background:var(--ember);animation:pulse 1.6s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+    .composer{background:#F3F1EC;border-radius:12px;padding:12px 14px;font-size:14px;color:#80838C}
+    .run{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--fog);font-size:13px;line-height:18px}
+    .avatar{width:24px;height:24px;flex:none;border-radius:99px;display:grid;place-items:center;font-size:10px;font-weight:600;background:var(--tint);color:var(--ember-deep)}
+    .step{display:flex;align-items:center;gap:12px;background:var(--white);border-radius:12px;padding:12px 14px;box-shadow:0 0 0 1px var(--fog),var(--shadow);width:100%;max-width:400px}
+    .step-ic{width:34px;height:34px;flex:none;border-radius:8px;display:grid;place-items:center;background:var(--paper);color:var(--ink)}
+    .connector{width:1.5px;height:22px;background:var(--graphite);opacity:.45;position:relative;margin-inline:auto}
+    .connector.dashed{background:none;border-left:1.5px dashed rgba(74,78,90,.5)}
+    .connector::after{content:"";position:absolute;left:50%;bottom:-3px;width:6px;height:6px;border-radius:99px;background:var(--ember);transform:translateX(-50%)}
+    .dotgrid{background-image:radial-gradient(var(--fog) 1.2px,transparent 1.3px);background-size:24px 24px}
+
+    /* status pills */
+    .pill{display:inline-flex;align-items:center;gap:6px;font-family:"JetBrains Mono",monospace;font-weight:500;font-size:11px;line-height:14px;letter-spacing:.08em;text-transform:uppercase;padding:4px 8px;border-radius:6px;white-space:nowrap}
+    .pill::before{content:"";width:6px;height:6px;border-radius:99px;background:currentColor}
+    .pill-run{color:var(--moss);background:rgba(46,125,107,.1)}
+    .pill-queue{color:var(--graphite);background:rgba(74,78,90,.09)}
+    .pill-new{color:var(--ember-deep);background:var(--tint)}
+
+    /* ---------- logos strip ---------- */
+    .marquee{overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+    .marquee-track{display:flex;width:max-content;animation:marq 38s linear infinite}
+    .marquee:hover .marquee-track{animation-play-state:paused}
+    @keyframes marq{to{transform:translateX(-50%)}}
+    .wm{display:flex;align-items:center;gap:8px;padding-inline:36px;color:var(--graphite);white-space:nowrap;opacity:.85}
+
+    /* ---------- product rows ---------- */
+    .rail{position:sticky;top:96px}
+    .rail a{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 4px;border-bottom:1px solid var(--fog);font-size:11px;line-height:14px;text-align:center;color:var(--graphite);position:relative}
+    .rail a::before{content:"";position:absolute;left:-1px;top:0;bottom:0;width:2px;background:var(--ember);transform:scaleY(0);transition:transform .3s var(--ease)}
+    .rail a.active{background:var(--white);color:var(--ink)}
+    .rail a.active::before{transform:scaleY(1)}
+    .rail a:hover{color:var(--ink)}
+    .rail a:focus-visible{outline:2px solid var(--ember-deep);outline-offset:-2px}
+    .rail a:active{opacity:.7}
+    .tag{display:inline-flex;align-items:center;gap:8px;font-family:"JetBrains Mono",monospace;font-weight:500;font-size:12px;line-height:16px;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border-radius:6px;color:var(--ember-deep);background:var(--white);box-shadow:inset 0 0 0 1px rgba(184,58,20,.35)}
+    .tag-dark{color:var(--tint);background:rgba(255,227,217,.06);box-shadow:inset 0 0 0 1px rgba(255,227,217,.35)}
+    .callout{position:relative;display:block;border-radius:12px;padding:16px 18px;background:linear-gradient(100deg,rgba(255,227,217,.55),rgba(255,255,255,.6) 60%,rgba(255,227,217,.35));box-shadow:inset 0 0 0 1px rgba(184,58,20,.35)}
+    .callout b{font-weight:600;text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px}
+    .callout:hover b{text-decoration-thickness:2px;color:var(--ember-deep)}
+    .callout:focus-visible{outline:2px solid var(--ember-deep);outline-offset:3px}
+    .callout:active{transform:scale(.995)}
+    .panel{position:relative;overflow:hidden;border-radius:4px;min-height:420px;display:grid;grid-template-columns:minmax(0,1fr);place-items:center;padding:40px 24px}
+    @media (min-width:1024px){.panel{min-height:600px;padding:56px}}
+    .panel::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:var(--grain);opacity:.12;mix-blend-mode:overlay}
+    .pg-ember{background:radial-gradient(55% 45% at 15% 5%,#FFD2C2 0%,transparent 70%),radial-gradient(60% 55% at 95% 95%,#FF5B2E 0%,transparent 70%),radial-gradient(45% 40% at 70% 40%,rgba(255,227,217,.7) 0%,transparent 70%),#FF8E68}
+    .pg-ink{background:radial-gradient(55% 50% at 90% 100%,rgba(255,91,46,.55) 0%,transparent 70%),radial-gradient(60% 55% at 0% 0%,#4A4E5A 0%,transparent 70%),radial-gradient(40% 40% at 50% 50%,rgba(255,227,217,.08),transparent 70%),#1C1F2A}
+    .pg-sand{background:radial-gradient(55% 55% at 0% 100%,#FFE3D9 0%,transparent 70%),radial-gradient(55% 50% at 100% 0%,#FFB49A 0%,transparent 70%),radial-gradient(50% 50% at 60% 60%,#F6F4EE,transparent 70%),#E9DFD3}
+    .pg-deep{background:radial-gradient(60% 50% at 100% 0%,#FF5B2E 0%,transparent 70%),radial-gradient(60% 60% at 0% 100%,#5E1E0A 0%,transparent 70%),radial-gradient(40% 40% at 40% 40%,rgba(255,227,217,.25),transparent 70%),#B83A14}
+    .pg-slate{background:radial-gradient(55% 55% at 0% 0%,#E4E1D8 0%,transparent 70%),radial-gradient(60% 55% at 100% 100%,rgba(255,91,46,.45) 0%,transparent 70%),radial-gradient(50% 50% at 50% 50%,#8B8F99,transparent 75%),#6A6E79}
+    .glass{position:relative;z-index:1;background:var(--white);border-radius:20px;box-shadow:0 0 0 6px rgba(255,255,255,.35),0 2px 4px rgba(18,20,28,.06),0 24px 56px -12px rgba(18,20,28,.3);width:100%;max-width:480px}
+    .note{position:absolute;z-index:2;background:rgba(255,255,255,.97);border-radius:12px;padding:12px 14px;box-shadow:0 0 0 1px rgba(18,20,28,.05),var(--shadow-float);font-size:12px;line-height:18px;max-width:270px}
+    .note-h{display:flex;align-items:center;gap:6px;color:var(--ember-deep);font-weight:600;font-size:12px;margin-bottom:4px}
+    .chip{display:inline-flex;align-items:center;padding:2px 6px;border-radius:6px;font-family:"JetBrains Mono",monospace;font-size:11px;font-weight:500}
+    .chip-up{background:rgba(46,125,107,.1);color:var(--moss)}
+    .chip-down{background:var(--tint);color:var(--ember-deep)}
+
+    /* ---------- dark sections ---------- */
+    .dark{background:var(--ink);color:var(--paper)}
+    .night{background:var(--night);color:var(--paper)}
+    .dots{height:80px;background-image:radial-gradient(rgba(246,244,238,.2) 1px,transparent 1.3px);background-size:6px 6px}
+    .dark .frame-lines,.night .frame-lines{border-color:rgba(246,244,238,.12)}
+    .rule-dark{border-top:1px solid rgba(246,244,238,.12)}
+    .tile{width:64px;height:64px;border-radius:14px;display:grid;place-items:center;background:rgba(246,244,238,.14);box-shadow:inset 0 0 0 1px rgba(246,244,238,.28),0 10px 24px rgba(18,20,28,.25);backdrop-filter:blur(6px);font-family:"JetBrains Mono",monospace;font-weight:500;font-size:11px;color:var(--paper);letter-spacing:.02em}
+    .chiplight{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;background:rgba(255,255,255,.92);color:var(--ink);font-size:13px;font-weight:500;box-shadow:0 1px 2px rgba(18,20,28,.15)}
+
+    /* ---------- why grid ---------- */
+    .why-ic{color:var(--ember-deep)}
+
+    /* ---------- testimonial ---------- */
+    .photo{position:relative;overflow:hidden;border-radius:4px;background:var(--fog)}
+    .photo img{width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.05)}
+    .photo .treat{position:absolute;inset:0;background:#FF8E68;mix-blend-mode:multiply}
+    .photo .shade{position:absolute;inset:0}
+    .play{position:absolute;left:16px;top:16px;z-index:2;width:48px;height:48px;border-radius:99px;display:grid;place-items:center;background:rgba(246,244,238,.85);color:var(--ink);transition:transform .25s var(--spring)}
+    .play:hover{transform:scale(1.06)}
+    .play:active{transform:scale(.95)}
+    .play:focus-visible{outline:2px solid var(--paper);outline-offset:3px}
+    .qtabs{display:grid;grid-template-columns:repeat(2,1fr);gap:4px;padding:4px;border-radius:12px;background:#EEEBE4}
+    @media (min-width:640px){.qtabs{grid-template-columns:repeat(4,1fr)}}
+    .qtab{padding:10px 8px;border-radius:8px;font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:15px;letter-spacing:-.02em;color:var(--graphite);cursor:pointer}
+    .qtab[aria-selected="true"]{background:var(--white);color:var(--ink);box-shadow:var(--shadow)}
+    .qtab:hover{color:var(--ink)}
+    .qtab:focus-visible{outline:2px solid var(--ember-deep);outline-offset:1px}
+    .qtab:active{opacity:.7}
+    .quote{font-family:"Space Grotesk",sans-serif;font-weight:500;letter-spacing:-.015em;font-size:24px;line-height:32px}
+    @media (min-width:1024px){.quote{font-size:32px;line-height:40px}}
+    .laurel{color:#9A9DA5}
+
+    /* ---------- stats ---------- */
+    .stat{border:1px solid rgba(255,227,217,.22);padding:20px 16px;text-align:center}
+    .stat + .stat{border-left:0}
+
+    /* ---------- closing + footer ---------- */
+    .closing{position:relative;overflow:hidden}
+    .closing-glow{position:absolute;inset:0 0 auto 0;height:1200px;pointer-events:none;background:
+      radial-gradient(55% 22% at 50% 26%,rgba(246,244,238,1),rgba(246,244,238,0) 100%),
+      radial-gradient(38% 26% at 4% 46%,rgba(255,91,46,.6),transparent 70%),
+      radial-gradient(42% 28% at 96% 48%,rgba(184,58,20,.55),transparent 70%),
+      radial-gradient(75% 24% at 50% 52%,rgba(255,170,135,.8),transparent 72%),
+      radial-gradient(30% 20% at 25% 44%,rgba(255,227,217,.9),transparent 70%),
+      radial-gradient(28% 20% at 78% 42%,rgba(255,91,46,.4),transparent 70%)}
+    .footer-panel{position:relative;overflow:hidden;border-radius:20px;background:
+      radial-gradient(50% 35% at 10% 0%,rgba(255,91,46,.55),transparent 70%),
+      radial-gradient(45% 40% at 95% 5%,rgba(255,140,100,.35),transparent 70%),
+      radial-gradient(60% 50% at 40% 55%,rgba(184,58,20,.35),transparent 70%),
+      linear-gradient(180deg,#B83A14 0%,#6A230E 32%,#2A130A 68%,#12141C 100%);color:var(--paper);
+      box-shadow:0 0 0 1px rgba(255,227,217,.12),0 30px 80px -20px rgba(184,58,20,.45)}
+    .footer-panel::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:var(--grain);opacity:.1;mix-blend-mode:overlay}
+    .f-head{font-family:"JetBrains Mono",monospace;font-weight:500;font-size:12px;line-height:16px;letter-spacing:.14em;text-transform:uppercase;color:rgba(246,244,238,.6)}
+    .f-link{display:inline-flex;align-items:center;gap:4px;font-size:14px;line-height:20px;font-weight:500;color:rgba(246,244,238,.92);border-radius:4px}
+    .f-link .ic{transition:transform .25s var(--spring)}
+    .f-link:hover{color:var(--white)}
+    .f-link:hover .ic{transform:translateX(2px)}
+    .f-link:focus-visible{outline:2px solid var(--tint);outline-offset:2px}
+    .f-link:active{opacity:.7}
+    .f-pill{display:inline-flex;align-items:center;gap:4px;padding:8px 14px;border-radius:12px;background:rgba(246,244,238,.1);font-size:14px;font-weight:500;width:100%;max-width:184px}
+    .f-pill:hover{background:rgba(246,244,238,.16)}
+    .f-pill:focus-visible{outline:2px solid var(--tint);outline-offset:2px}
+    .f-pill:active{opacity:.75}
+    .social{width:36px;height:36px;display:grid;place-items:center;border-radius:10px;color:var(--paper)}
+    .social:hover{background:rgba(246,244,238,.1)}
+    .social:focus-visible{outline:2px solid var(--tint)}
+    .social:active{transform:scale(.94)}
+
+    /* ---------- motion (transform + opacity only, brand easing) ---------- */
+    @keyframes enterUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @keyframes popIn{from{opacity:0;transform:scale(.96) translateY(4px)}to{opacity:1;transform:none}}
+    @keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+    @keyframes draw{to{stroke-dashoffset:0}}
+    @keyframes tabProg{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+    @keyframes drift{from{transform:translate3d(0,0,0) rotate(0deg)}to{transform:translate3d(7%,-5%,0) rotate(6deg)}}
+    /* hero mockup: plays every time a tab renders */
+    .enter{animation:enterUp .3s var(--ease) both;animation-delay:calc(var(--i,0) * 90ms)}
+    .enter-pop{animation:popIn .3s var(--ease) both;animation-delay:calc(var(--i,0) * 90ms)}
+    .connector.enter{animation-name:growY;transform-origin:top}
+    /* scroll reveals */
+    html.js .reveal{opacity:0;transform:translateY(10px);transition:opacity .3s var(--ease),transform .45s var(--ease)}
+    html.js .reveal.in{opacity:1;transform:none}
+    /* in-view sequences inside panels */
+    html.js .anim-scope .seq{opacity:0}
+    .anim-scope.in .seq{animation:enterUp .3s var(--ease) both;animation-delay:calc(var(--i,0) * 70ms + 200ms)}
+    .anim-scope.in .seq.pop{animation-name:popIn}
+    circle.pop{transform-box:fill-box;transform-origin:center}
+    html.js .draw-path{stroke-dasharray:1;stroke-dashoffset:1}
+    .anim-scope.in .draw-path{animation:draw .9s var(--ease) forwards;animation-delay:calc(var(--i,0) * 70ms + 200ms)}
+    /* slow light drift on gradient panels */
+    .panel::before{content:"";position:absolute;inset:-25%;pointer-events:none;background:radial-gradient(30% 30% at 30% 35%,rgba(255,255,255,.22),transparent 70%),radial-gradient(28% 28% at 72% 68%,rgba(255,227,217,.2),transparent 70%);animation:drift 18s ease-in-out infinite alternate}
+
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important}
+      .marquee-track,.panel::before{animation:none}
+      html.js .reveal,html.js .anim-scope .seq{opacity:1!important;transform:none!important}
+      html.js .draw-path{stroke-dashoffset:0!important}
+      html{scroll-behavior:auto}
+    }
+  </style>
+</head>
+<body>
+<a href="#main" class="skip t-small">Skip to content</a>
+
+<!-- Icon sprite (Lucide geometry, 1.75 stroke) -->
+<svg width="0" height="0" class="absolute" aria-hidden="true">
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-user-plus" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></symbol>
+  <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3l14 9-14 9V3z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-headset" viewBox="0 0 24 24"><path d="M3 14h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a9 9 0 0 1 18 0v7a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3"/></symbol>
+  <symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M4 9h16"/><path d="M4 15h16"/><path d="M10 3 8 21"/><path d="M16 3l-2 18"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></symbol>
+  <symbol id="i-linkedin" viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></symbol>
+  <symbol id="i-youtube" viewBox="0 0 24 24"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><path d="m10 15 5-3-5-3z"/></symbol>
+  <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+  <symbol id="i-laurel" viewBox="0 0 40 64"><g fill="currentColor" stroke="none"><ellipse cx="22" cy="8" rx="3.2" ry="6" transform="rotate(-30 22 8)"/><ellipse cx="14" cy="16" rx="3.2" ry="6.5" transform="rotate(-55 14 16)"/><ellipse cx="10" cy="27" rx="3.2" ry="6.5" transform="rotate(-80 10 27)"/><ellipse cx="10" cy="38" rx="3.2" ry="6.5" transform="rotate(-105 10 38)"/><ellipse cx="14" cy="48" rx="3.2" ry="6.5" transform="rotate(-130 14 48)"/><ellipse cx="22" cy="56" rx="3.2" ry="6" transform="rotate(-150 22 56)"/><ellipse cx="24" cy="20" rx="2.6" ry="5" transform="rotate(20 24 20)"/><ellipse cx="21" cy="32" rx="2.6" ry="5" transform="rotate(5 21 32)"/><ellipse cx="24" cy="44" rx="2.6" ry="5" transform="rotate(-20 24 44)"/></g></symbol>
+  <symbol id="mark" viewBox="0 0 64 64"><path d="M50.71 28.70 A19 19 0 1 1 35.30 13.29" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><circle cx="45.44" cy="18.56" r="4" fill="#FF5B2E"/></symbol>
+</svg>
+
+<!-- Announcement -->
+<div class="announce">
+  <div class="frame flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-6 py-3 text-center text-[14px] leading-[20px]">
+    <span class="font-display font-semibold text-ember">Automation Audit</span>
+    <span>A ranked map of what to automate, with the ROI of each. Fixed $2,500, two weeks.</span>
+    <a href="#audit" class="link inline-flex items-center gap-1 font-semibold !text-paper !decoration-transparent hover:!decoration-paper focus-visible:!outline-ember-tint">See what's included <svg class="ic ic-xs"><use href="#i-chev"/></svg></a>
+  </div>
+</div>
+
+<!-- Nav -->
+<header class="nav">
+  <div class="frame flex h-16 items-center gap-6 px-6 lg:px-10">
+    <a href="#top" class="rounded-[8px] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ember-deep active:opacity-80" aria-label="Loopwright home">
+      <svg viewBox="0 0 292 64" width="146" height="32" role="img" aria-hidden="true">
+        <path d="M50.71 28.70 A19 19 0 1 1 35.30 13.29" fill="none" stroke="#12141C" stroke-width="7" stroke-linecap="round"/>
+        <circle class="node" cx="45.44" cy="18.56" r="4" fill="#FF5B2E"/>
+        <text x="76" y="43" font-family="'Space Grotesk', Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="-1.2" fill="#12141C">loopwright</text>
+      </svg>
+    </a>
+
+    <nav class="ml-6 hidden items-center gap-1 lg:flex" aria-label="Primary">
+      <div class="dd">
+        <button type="button" class="nav-link" aria-expanded="false">Services <svg class="ic ic-sm"><use href="#i-down"/></svg></button>
+        <div class="dd-panel">
+          <a class="dd-item" href="#audit"><b>Automation Audit</b><span>Two weeks. A ranked map of what to automate. Fixed $2,500.</span></a>
+          <a class="dd-item" href="#workflows"><b>Build</b><span>Custom agents and workflows, from $8,000 per project.</span></a>
+          <a class="dd-item" href="#resources"><b>Run</b><span>Monitoring, fixes and monthly improvements, from $1,500/month.</span></a>
+        </div>
+      </div>
+      <div class="dd">
+        <button type="button" class="nav-link" aria-expanded="false">Workflows <svg class="ic ic-sm"><use href="#i-down"/></svg></button>
+        <div class="dd-panel">
+          <a class="dd-item" href="#lead"><b>Lead intake</b><span>Every enquiry answered in under two minutes.</span></a>
+          <a class="dd-item" href="#invoicing"><b>Invoicing</b><span>Overdue invoices chased on schedule.</span></a>
+          <a class="dd-item" href="#onboarding"><b>Onboarding</b><span>New clients set up in eleven minutes.</span></a>
+          <a class="dd-item" href="#reporting"><b>Reporting</b><span>The weekly report, written before Monday.</span></a>
+          <a class="dd-item" href="#triage"><b>Inbox triage</b><span>A shared inbox that sorts itself.</span></a>
+        </div>
+      </div>
+      <div class="dd">
+        <button type="button" class="nav-link" aria-expanded="false">Resources <svg class="ic ic-sm"><use href="#i-down"/></svg></button>
+        <div class="dd-panel">
+          <a class="dd-item" href="#resources"><b>Playbooks</b><span>Teardowns of real workflows, costs included.</span></a>
+          <a class="dd-item" href="#stories"><b>Client stories</b><span>What changed for the teams we work with.</span></a>
+          <a class="dd-item" href="#runbooks"><b>Sample runbook</b><span>What every workflow ships with.</span></a>
+        </div>
+      </div>
+      <a class="nav-link" href="#audit">Pricing</a>
+    </nav>
+
+    <div class="ml-auto flex items-center gap-2">
+      <a href="#" class="nav-link hidden text-graphite md:inline-flex">Client login</a>
+      <a href="#resources" class="btn btn-secondary btn-sm hidden md:inline-flex">Talk to an engineer</a>
+      <a href="#audit" class="btn btn-ink btn-sm hidden sm:inline-flex">Book an audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      <button type="button" id="menu-btn" class="menu-btn grid h-11 w-11 place-items-center lg:hidden" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
+        <svg class="ic"><use href="#i-menu"/></svg>
+      </button>
+    </div>
+  </div>
+  <nav id="mobile-menu" class="hidden border-t border-fog px-6 pb-6 pt-2 lg:hidden" aria-label="Mobile">
+    <a class="dd-item" href="#audit"><b>Automation Audit</b><span>Fixed $2,500 · two weeks</span></a>
+    <a class="dd-item" href="#workflows"><b>Workflows</b><span>Lead intake, invoicing, onboarding, reporting, inbox triage</span></a>
+    <a class="dd-item" href="#stories"><b>Client stories</b></a>
+    <a class="dd-item" href="#resources"><b>Resources</b></a>
+    <a href="#audit" class="btn btn-primary mt-4 w-full">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+  </nav>
+</header>
+
+<main id="main">
+<!-- ============ HERO ============ -->
+<section id="top" class="hero grain">
+  <div class="stripes" aria-hidden="true">
+    <i style="--s:62;--a:.16"></i><i style="--s:52;--a:.24"></i><i style="--s:44;--a:.32"></i><i style="--s:34;--a:.42"></i><i style="--s:26;--a:.52"></i><i style="--s:16;--a:.62"></i><i style="--s:8;--a:.7"></i><i style="--s:20;--a:.58"></i><i style="--s:4;--a:.5"></i>
+  </div>
+  <div class="hero-glow" aria-hidden="true"></div>
+
+  <div id="hero-copy" class="frame relative px-6 pb-16 pt-16 lg:px-12 lg:pb-[72px] lg:pt-[88px]">
+    <h1 class="t-display max-w-[620px]">Work that<br class="hidden sm:inline"> runs itself.</h1>
+    <p class="t-lead muted mt-5 max-w-[560px]">We design, build and run AI agents and workflow automations for operations teams, so the repetitive work happens without anyone touching it.</p>
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href="#audit" class="btn btn-primary">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      <a href="#workflows" class="btn btn-secondary">See what we'd automate <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+
+  <!-- product mockup with workflow tabs -->
+  <div class="mock-wrap px-3 pb-16 sm:px-6 lg:px-[48px] lg:pb-[88px]">
+    <div class="mock-band" aria-hidden="true"><i style="--a:.30"></i><i style="--a:.45"></i><i style="--a:.55"></i><i style="--a:.62"></i><i style="--a:.66"></i><i style="--a:.62"></i><i style="--a:.55"></i><i style="--a:.48"></i><i style="--a:.4"></i><i style="--a:.3"></i></div>
+    <div id="mock" class="mock mx-auto max-w-[1344px]">
+      <div class="mock-tabs" role="tablist" aria-label="Example workflows" id="mock-tabs"></div>
+      <div class="mock-body" id="mock-body" role="tabpanel" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROOF STRIP ============ -->
+<section aria-label="Clients" class="border-y border-fog bg-paper">
+  <div class="frame frame-lines grid items-center lg:grid-cols-[300px_1fr]">
+    <div class="flex items-center gap-3 border-b border-fog px-6 py-5 lg:border-b-0 lg:border-r lg:py-8">
+      <svg class="h-9 w-9 flex-none text-ink" aria-hidden="true"><use href="#mark"/></svg>
+      <p class="t-small"><span class="font-display text-[17px] font-semibold">140+ workflows</span> in production for ops teams</p>
+    </div>
+    <div class="marquee py-6 lg:py-8" aria-label="Teams we work with">
+      <div class="marquee-track">
+        <div class="flex items-center" id="wm-set">
+          <span class="wm font-display text-[21px] font-semibold tracking-[-.03em]">Harbor&nbsp;&amp;&nbsp;Vale</span>
+          <span class="wm font-mono text-[15px] font-medium uppercase tracking-[.12em]">Northline Freight</span>
+          <span class="wm font-sans text-[20px] font-semibold italic tracking-[-.02em]">clearwater clinics</span>
+          <span class="wm font-display text-[20px] font-medium tracking-[.08em]">FIELDHOUSE</span>
+          <span class="wm font-sans text-[19px] font-semibold">Brightmark<span class="text-ember-deep">.</span></span>
+          <span class="wm font-display text-[21px] font-semibold tracking-[-.04em]">kestrel&amp;co</span>
+          <span class="wm font-mono text-[15px] font-medium tracking-[-.02em]">tidewater/ops</span>
+          <span class="wm font-display text-[19px] font-medium uppercase tracking-[.2em]">Pryce</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ WORKFLOW ROWS ============ -->
+<section id="workflows" aria-label="Workflows we build" class="bg-paper">
+  <div class="frame frame-lines lg:grid lg:grid-cols-[88px_1fr]">
+    <aside class="hidden border-r border-fog lg:block" aria-label="Jump to workflow">
+      <nav class="rail" id="rail">
+        <a href="#lead" data-for="lead"><svg class="ic"><use href="#i-user-plus"/></svg>Lead intake</a>
+        <a href="#invoicing" data-for="invoicing"><svg class="ic"><use href="#i-receipt"/></svg>Invoicing</a>
+        <a href="#onboarding" data-for="onboarding"><svg class="ic"><use href="#i-clipboard"/></svg>Onboarding</a>
+        <a href="#reporting" data-for="reporting"><svg class="ic"><use href="#i-chart"/></svg>Reporting</a>
+        <a href="#triage" data-for="triage"><svg class="ic"><use href="#i-inbox"/></svg>Inbox triage</a>
+      </nav>
+    </aside>
+
+    <div>
+      <!-- 1 Lead intake -->
+      <article id="lead" class="wrow anim-scope gridscroll-mt-24 items-center gap-8 border-b border-fog px-6 py-12 lg:grid-cols-[1fr_minmax(0,604px)] lg:gap-10 lg:px-10 lg:py-4 lg:pr-4">
+        <div class="lg:py-16">
+          <span class="tag"><svg class="ic ic-sm"><use href="#i-user-plus"/></svg>Lead intake</span>
+          <h2 class="t-h2 mt-5 max-w-[520px]">Every lead answered in under two minutes</h2>
+          <p class="t-body muted mt-3 max-w-[540px]">New enquiries from your site, inbox and forms are enriched, scored and routed to the right person, with a first reply drafted before anyone opens the CRM.</p>
+          <a href="#audit" class="btn btn-secondary mt-6">See the lead intake workflow <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <a href="#audit" class="callout mt-10 max-w-[556px]"><b>Lead scoring agent</b><span class="t-small muted mt-1 block !font-normal">Scores each lead against your last 200 closed deals and tells your team why it ranked high.</span></a>
+        </div>
+        <div class="panel pg-ember">
+          <div class="glass p-5">
+            <div class="seq rounded-[12px] bg-ember-tint/70 p-3 text-[13px] leading-[19px] shadow-[inset_0_0_0_1px_rgba(184,58,20,.2)]">
+              <div class="note-h"><svg class="ic ic-xs"><use href="#i-sparkle"/></svg>Loopwright agent</div>
+              New lead: <b>Fernhill Dental</b>, 42 staff, 3 locations. Matches your best-fit profile. Want me to book them in?
+            </div>
+            <div class="seq mt-3 ml-auto w-fit rounded-[12px] bg-[#F3F1EC] px-3 py-2 text-[13px]">Yes, with Sam this week.</div>
+            <p class="seq mt-3 flex gap-2 text-[13px] leading-[19px]"><svg class="ic ic-sm mt-0.5 text-moss"><use href="#i-check"/></svg>Intro call Thursday 10:30. Invite sent, HubSpot updated, reply drafted for Sam.</p>
+            <div class="seq mt-4 rounded-[12px] p-3 shadow-[inset_0_0_0_1px_#E4E1D8]">
+              <div class="flex items-center justify-between text-[12px] text-graphite"><span>Leads routed, last 8 weeks</span><span class="chip chip-up">+31%</span></div>
+              <svg viewBox="0 0 300 70" class="mt-2 w-full" aria-hidden="true"><path class="draw-path" pathLength="1" d="M0 58 C40 54 60 50 90 44 S150 40 180 30 240 22 300 10" fill="none" stroke="#FF5B2E" stroke-width="2"/><path class="seq" d="M0 58 C40 54 60 50 90 44 S150 40 180 30 240 22 300 10 V70 H0Z" fill="rgba(255,91,46,.1)"/><circle class="seq pop" cx="180" cy="30" r="4" fill="#FF5B2E"/></svg>
+            </div>
+            <div class="seq composer mt-4 flex items-center justify-between">Ask about this workflow… <svg class="ic ic-sm"><use href="#i-up"/></svg></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 2 Invoicing -->
+      <article id="invoicing" class="wrow anim-scope gridscroll-mt-24 items-center gap-8 border-b border-fog px-6 py-12 lg:grid-cols-[1fr_minmax(0,604px)] lg:gap-10 lg:px-10 lg:py-4 lg:pr-4">
+        <div class="lg:py-16">
+          <span class="tag"><svg class="ic ic-sm"><use href="#i-receipt"/></svg>Invoicing</span>
+          <h2 class="t-h2 mt-5 max-w-[520px]">Your invoices get chased automatically</h2>
+          <p class="t-body muted mt-3 max-w-[540px]">Polite reminders go out on day 7, 14 and 21, written in your tone. Anything disputed or over your threshold lands with a person, full history attached.</p>
+          <a href="#audit" class="btn btn-secondary mt-6">See the invoicing workflow <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <a href="#audit" class="callout mt-10 max-w-[556px]"><b>Exception routing</b><span class="t-small muted mt-1 block !font-normal">Disputes, part payments and anything over $5,000 go to your finance lead in Slack. Never to a bot.</span></a>
+        </div>
+        <div class="panel pg-ink">
+          <div class="glass p-5 pt-16">
+            <div class="note seq pop left-[-8px] top-[-14px] sm:left-[-28px]" style="--i:5">
+              <div class="note-h"><svg class="ic ic-xs"><use href="#i-sparkle"/></svg>Loopwright agent</div>
+              <p class="text-graphite">Overdue balance is down 64% since the chase workflow went live 8 weeks ago.</p>
+              <div class="mt-2 flex items-center justify-between"><span class="flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-moss"></i>Overdue balance</span><span class="chip chip-up">−64%</span></div>
+            </div>
+            <div class="flex text-[11px] text-graphite">
+              <div class="flex flex-col justify-between pr-2 text-right font-mono" style="height:220px"><span>$30K</span><span>$20K</span><span>$10K</span><span>0</span></div>
+              <svg viewBox="0 0 400 220" class="w-full" style="height:220px" preserveAspectRatio="none" aria-hidden="true">
+                <g stroke="#E4E1D8" stroke-width="1"><path d="M0 1H400"/><path d="M0 73H400"/><path d="M0 146H400"/><path d="M0 219H400"/></g>
+                <path class="draw-path" pathLength="1" d="M0 22 L50 30 L100 18 L150 40 L200 82 L250 110 L300 128 L350 140 L400 146" fill="none" stroke="#12141C" stroke-width="2"/>
+                <path class="seq" d="M0 22 L50 30 L100 18 L150 40 L200 82 L250 110 L300 128 L350 140 L400 146 V220 H0Z" fill="rgba(255,91,46,.08)"/>
+                <path class="seq" d="M150 0 V220" stroke="#FF5B2E" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+              </svg>
+            </div>
+            <div class="mt-3 flex items-center justify-between text-[12px] text-graphite"><span class="font-mono">WK 1</span><span class="pill pill-new">Workflow live</span><span class="font-mono">WK 12</span></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 3 Onboarding -->
+      <article id="onboarding" class="wrow anim-scope gridscroll-mt-24 items-center gap-8 border-b border-fog px-6 py-12 lg:grid-cols-[1fr_minmax(0,604px)] lg:gap-10 lg:px-10 lg:py-4 lg:pr-4">
+        <div class="lg:py-16">
+          <span class="tag"><svg class="ic ic-sm"><use href="#i-clipboard"/></svg>Onboarding</span>
+          <h2 class="t-h2 mt-5 max-w-[520px]">Onboarding in eleven minutes, not two days</h2>
+          <p class="t-body muted mt-3 max-w-[540px]">Contracts, accounts, welcome packs and kickoff calls happen in the right order the moment a deal closes. Your team gets a summary, not a to-do list.</p>
+          <a href="#audit" class="btn btn-secondary mt-6">See the onboarding workflow <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <a href="#audit" class="callout mt-10 max-w-[556px]"><b>Handover summary</b><span class="t-small muted mt-1 block !font-normal">One message to the account lead: what was set up, what is waiting on the client, and when kickoff is.</span></a>
+        </div>
+        <div class="panel pg-sand">
+          <div class="glass p-5">
+            <div class="flex items-center justify-between border-b border-fog pb-3">
+              <p class="text-[14px] font-semibold">New client · Oak &amp; Cole Lettings</p>
+              <span class="pill pill-run">Running</span>
+            </div>
+            <ol class="mt-1 text-[13px]">
+              <li class="seq flex items-center gap-3 border-b border-fog py-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-moss text-white"><svg class="ic ic-xs"><use href="#i-check"/></svg></span><span class="flex-1">Contract countersigned</span><span class="font-mono text-[11px] text-graphite">0:00</span></li>
+              <li class="seq flex items-center gap-3 border-b border-fog py-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-moss text-white"><svg class="ic ic-xs"><use href="#i-check"/></svg></span><span class="flex-1">Workspace and logins created</span><span class="font-mono text-[11px] text-graphite">2:14</span></li>
+              <li class="seq flex items-center gap-3 border-b border-fog py-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-moss text-white"><svg class="ic ic-xs"><use href="#i-check"/></svg></span><span class="flex-1">Welcome pack sent</span><span class="font-mono text-[11px] text-graphite">4:40</span></li>
+              <li class="seq flex items-center gap-3 border-b border-fog py-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-moss text-white"><svg class="ic ic-xs"><use href="#i-check"/></svg></span><span class="flex-1">Kickoff booked for Tue 14:00</span><span class="font-mono text-[11px] text-graphite">8:05</span></li>
+              <li class="seq flex items-center gap-3 py-3"><span class="grid h-6 w-6 place-items-center rounded-full bg-ember-tint text-ember-deep"><i class="h-2 w-2 rounded-full bg-ember"></i></span><span class="flex-1">Handover summary to account lead</span><span class="pill pill-new">Now</span></li>
+            </ol>
+          </div>
+          <div class="note seq pop bottom-6 right-4 sm:bottom-10 sm:right-8">
+            <div class="flex items-center gap-2"><svg class="ic ic-sm text-ember-deep"><use href="#i-clock"/></svg><span class="font-display text-[22px] font-semibold tracking-[-.02em]">11 min</span></div>
+            <p class="text-graphite">Total time. Nobody touched it.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- 4 Reporting -->
+      <article id="reporting" class="wrow anim-scope gridscroll-mt-24 items-center gap-8 border-b border-fog px-6 py-12 lg:grid-cols-[1fr_minmax(0,604px)] lg:gap-10 lg:px-10 lg:py-4 lg:pr-4">
+        <div class="lg:py-16">
+          <span class="tag"><svg class="ic ic-sm"><use href="#i-chart"/></svg>Reporting</span>
+          <h2 class="t-h2 mt-5 max-w-[520px]">Monday's report, ready before Monday</h2>
+          <p class="t-body muted mt-3 max-w-[540px]">Numbers from your CRM, finance tools and spreadsheets are pulled, checked and written up in plain English every week. Nobody exports a CSV.</p>
+          <a href="#audit" class="btn btn-secondary mt-6">See the reporting workflow <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <a href="#audit" class="callout mt-10 max-w-[556px]"><b>Anomaly notes</b><span class="t-small muted mt-1 block !font-normal">If a number moves more than you'd expect, the report says so and links to the rows behind it.</span></a>
+        </div>
+        <div class="panel pg-deep">
+          <div class="glass dotgrid p-5">
+            <div class="seq pop mx-auto w-[220px] rounded-[12px] bg-white p-3 text-center shadow-[0_0_0_1px_#E4E1D8,0_8px_24px_rgba(18,20,28,.08)]">
+              <p class="flex items-center justify-center gap-1.5 text-[12px] text-graphite"><svg class="ic ic-xs"><use href="#i-chart"/></svg>Revenue booked, this week</p>
+              <p class="font-display mt-1 text-[34px] font-semibold leading-[40px] tracking-[-.03em]">$412K</p>
+              <div class="mt-2 flex justify-center gap-2"><span class="chip chip-up">WoW ↑6.2%</span><span class="chip chip-up">YoY ↑18%</span></div>
+            </div>
+            <div class="seq mx-auto h-6 w-px border-l border-dashed border-graphite/50"></div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="seq pop rounded-[12px] bg-white p-3 text-center shadow-[0_0_0_1px_#E4E1D8]">
+                <p class="text-[12px] text-graphite">Jobs completed</p>
+                <p class="font-display text-[26px] font-semibold tracking-[-.03em]">1,284</p>
+                <span class="chip chip-up">↑ 3.4%</span>
+              </div>
+              <div class="seq pop rounded-[12px] bg-white p-3 text-center shadow-[0_0_0_2px_#FF5B2E]">
+                <p class="text-[12px] text-graphite">Days to invoice</p>
+                <p class="font-display text-[26px] font-semibold tracking-[-.03em]">4.8</p>
+                <span class="chip chip-down">↑ 2.1 days</span>
+              </div>
+            </div>
+          </div>
+          <div class="note seq pop bottom-5 left-4 sm:bottom-8 sm:left-8">
+            <div class="note-h"><svg class="ic ic-xs"><use href="#i-sparkle"/></svg>Anomaly note</div>
+            <p class="text-graphite">Days to invoice jumped this week. 38 jobs from the Leeds team are missing sign-off.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- 5 Inbox triage -->
+      <article id="triage" class="wrow anim-scope gridscroll-mt-24 items-center gap-8 px-6 py-12 lg:grid-cols-[1fr_minmax(0,604px)] lg:gap-10 lg:px-10 lg:py-4 lg:pr-4">
+        <div class="lg:py-16">
+          <span class="tag"><svg class="ic ic-sm"><use href="#i-inbox"/></svg>Inbox triage</span>
+          <h2 class="t-h2 mt-5 max-w-[520px]">A shared inbox that sorts itself</h2>
+          <p class="t-body muted mt-3 max-w-[540px]">Every email is read, labelled and routed. Routine questions get a drafted reply for a person to approve. Urgent ones get flagged in Slack.</p>
+          <a href="#audit" class="btn btn-secondary mt-6">See the inbox triage workflow <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <a href="#audit" class="callout mt-10 max-w-[556px]"><b>Draft, don't send</b><span class="t-small muted mt-1 block !font-normal">Replies wait for a one-click approval until you decide a category is safe to send on its own.</span></a>
+        </div>
+        <div class="panel pg-slate">
+          <div class="glass overflow-hidden">
+            <div class="flex items-center gap-2 border-b border-fog px-4 py-3 text-[13px]"><svg class="ic ic-sm text-graphite"><use href="#i-mail"/></svg><span class="font-semibold">hello@clearwater</span><span class="ml-auto font-mono text-[11px] text-graphite">47 sorted today</span></div>
+            <ul class="text-[13px]">
+              <li class="seq flex items-center gap-3 border-b border-fog px-4 py-3"><span class="pill pill-new">Urgent</span><span class="flex-1 truncate">Burst pipe at 14 Mill Lane, tenant in</span><span class="text-[11px] text-graphite">Slack</span></li>
+              <li class="seq flex items-center gap-3 border-b border-fog px-4 py-3"><span class="pill pill-queue">Billing</span><span class="flex-1 truncate">Can I get a copy of March's invoice?</span><span class="text-[11px] text-graphite">Drafted</span></li>
+              <li class="seq flex items-center gap-3 border-b border-fog px-4 py-3"><span class="pill pill-queue">Booking</span><span class="flex-1 truncate">Reschedule Thursday's appointment</span><span class="text-[11px] text-graphite">Drafted</span></li>
+              <li class="flex items-center gap-3 px-4 py-3 opacity-60"><span class="pill pill-run">Done</span><span class="flex-1 truncate">Supplier statement, October</span><span class="text-[11px] text-graphite">Filed</span></li>
+            </ul>
+            <div class="seq m-3 rounded-[12px] bg-paper p-3 text-[13px] leading-[19px]">
+              <p class="text-[11px] font-mono uppercase tracking-[.08em] text-graphite">Draft reply · Billing</p>
+              <p class="mt-1">Hi Ana, March's invoice is attached. It was paid on the 4th, so nothing is outstanding. Anything else, just reply here.</p>
+              <div class="mt-3 flex gap-2"><button type="button" class="btn btn-ink btn-sm">Approve and send</button><button type="button" class="btn btn-secondary btn-sm">Edit</button></div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DARK: WHERE YOUR TEAM WORKS ============ -->
+<section class="dark" aria-labelledby="anywhere-h">
+  <div class="frame frame-lines">
+    <div class="dots" aria-hidden="true"></div>
+    <div class="rule-dark px-6 py-12 lg:px-4 lg:py-14">
+      <h2 id="anywhere-h" class="t-h2 text-ember-tint">Your automations, inside the tools you already use</h2>
+      <p class="t-body mt-2 text-paper/70">Talk to your workflows in Slack. Change them in plain English. Built on the stack you already pay for.</p>
+    </div>
+
+    <div class="rule-dark grid grid-cols-1 lg:grid-cols-2">
+      <div class="p-3 lg:border-r lg:border-paper/10 lg:p-4">
+        <div class="panel anim-scope pg-deep !min-h-[440px] lg:!min-h-[560px]">
+          <div class="relative z-[1] w-full max-w-[460px]">
+            <div class="flex justify-between gap-2">
+              <span class="tile seq pop">n8n</span><span class="tile seq pop">Make</span><span class="tile seq pop">Zapier</span><span class="tile seq pop">Slack</span><span class="tile seq pop">HubSpot</span>
+            </div>
+            <svg viewBox="0 0 460 200" class="block w-full" aria-hidden="true">
+              <g fill="none" stroke="rgba(246,244,238,.55)" stroke-width="1.5">
+                <path class="draw-path" pathLength="1" d="M32 0 C32 110 200 90 222 196"/><path class="draw-path" pathLength="1" d="M131 0 C131 100 214 110 226 196"/><path class="draw-path" pathLength="1" d="M230 0 V196"/><path class="draw-path" pathLength="1" d="M329 0 C329 100 246 110 234 196"/><path class="draw-path" pathLength="1" d="M428 0 C428 110 260 90 238 196"/>
+              </g>
+            </svg>
+            <div class="seq pop mx-auto grid h-[120px] w-[120px] place-items-center rounded-full bg-paper shadow-[0_0_0_8px_rgba(246,244,238,.18),0_20px_50px_rgba(18,20,28,.4)]">
+              <svg class="h-16 w-16 text-ink" aria-hidden="true"><use href="#mark"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center px-6 py-12 lg:px-24">
+        <div class="min-w-0 w-full">
+          <span class="tag tag-dark"><svg class="ic ic-sm"><use href="#i-hash"/></svg>In Slack</span>
+          <h3 class="t-h3 mt-5 text-ember-tint">Ask your workflows anything</h3>
+          <p class="t-body mt-3 max-w-[470px] text-paper/75">Tag @loopwright in Slack to check a run, pause a workflow or approve an exception. Your team doesn't learn a new dashboard.</p>
+          <a href="#audit" class="btn btn-ghost-dark mt-6">See it in Slack <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+        </div>
+      </div>
+    </div>
+
+    <div id="runbooks" class="rule-dark grid grid-cols-1 lg:grid-cols-2">
+      <div class="order-2 flex items-center px-6 py-12 lg:order-1 lg:border-r lg:border-paper/10 lg:px-24">
+        <div class="min-w-0 w-full">
+          <span class="tag tag-dark"><svg class="ic ic-sm"><use href="#i-file"/></svg>Documented</span>
+          <h3 class="t-h3 mt-5 max-w-[360px] text-ember-tint">Every workflow, written down and watched</h3>
+          <p class="t-body mt-3 max-w-[400px] text-paper/75">Each automation ships with a runbook: what triggers it, what it touches, and who gets alerted when something changes.</p>
+          <a href="#audit" class="btn btn-ghost-dark mt-6">Read a sample runbook <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+        </div>
+      </div>
+      <div class="order-1 p-3 lg:order-2 lg:p-4">
+        <div class="panel anim-scope pg-ink !min-h-[440px] lg:!min-h-[560px]">
+          <div class="relative z-[1] w-full max-w-[500px] text-center">
+            <div class="seq rounded-[8px] bg-white px-4 py-2.5 font-mono text-[12px] text-ink sm:text-[14px] shadow-[0_0_0_4px_rgba(246,244,238,.18)]">loopwright status --client harbor-vale</div>
+            <div class="seq mx-auto my-3 h-10 w-px bg-paper/60"></div>
+            <div class="rounded-[12px] bg-paper/10 p-4 shadow-[inset_0_0_0_1px_rgba(246,244,238,.16)] backdrop-blur-sm">
+              <p class="t-label text-paper/85">Triggers</p>
+              <div class="mt-3 flex flex-wrap justify-center gap-2"><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-file"/></svg>Web form</span><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-mail"/></svg>Inbox</span><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-calendar"/></svg>Schedule</span><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-branch"/></svg>CRM stage</span></div>
+              <div class="my-4 h-px bg-paper/15"></div>
+              <p class="t-label text-paper/85">Steps</p>
+              <div class="mt-3 flex flex-wrap justify-center gap-2"><span class="chiplight seq pop">Enrich</span><span class="chiplight seq pop">Classify</span><span class="chiplight seq pop">Draft</span><span class="chiplight seq pop">Write back</span><span class="chiplight seq pop">Notify</span></div>
+              <div class="my-4 h-px bg-paper/15"></div>
+              <p class="t-label text-paper/85">Guardrails</p>
+              <div class="mt-3 flex flex-wrap justify-center gap-2"><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-shield"/></svg>Human approval</span><span class="chiplight seq pop">Retries</span><span class="chiplight seq pop"><svg class="ic ic-xs"><use href="#i-activity"/></svg>Alerts</span><span class="chiplight seq pop">Audit log</span><span class="chiplight seq pop">Rollback</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dots rule-dark" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- ============ WHY ============ -->
+<section aria-labelledby="why-h" class="bg-paper">
+  <div class="frame frame-lines">
+    <div class="h-12 lg:h-20"></div>
+    <div class="rule flex flex-col items-start justify-between gap-6 px-6 py-8 sm:flex-row sm:items-center lg:px-4">
+      <h2 id="why-h" class="t-h2">Why ops teams choose Loopwright</h2>
+      <a href="#audit" class="btn btn-ink">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+    </div>
+    <div class="rule grid md:grid-cols-2">
+      <div class="px-6 py-7 lg:px-4"><h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-zap"/></svg>Live in 3 weeks</h3><p class="t-small muted mt-2 max-w-[560px] !font-normal md:pl-8">Average time from kickoff to your first live automation. We start with the task that eats the most hours.</p></div>
+      <div class="px-6 py-7 lg:px-4"><h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-file"/></svg>Clarity</h3><p class="t-small muted mt-2 max-w-[560px] !font-normal md:pl-8">You'll know exactly what is automated and why: a written map of every trigger, step and owner.</p></div>
+      <div class="px-6 py-7 lg:px-4"><h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-layers"/></svg>Craft</h3><p class="t-small muted mt-2 max-w-[560px] !font-normal md:pl-8">Every workflow ships documented, versioned and monitored. Built to last, not slapped together.</p></div>
+      <div class="px-6 py-7 lg:px-4"><h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-shield"/></svg>Calm</h3><p class="t-small muted mt-2 max-w-[560px] !font-normal md:pl-8">Exceptions go to a person, with context. 99.4% of managed runs finish without anyone stepping in.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ TESTIMONIAL ============ -->
+<section id="stories" aria-label="Client stories" class="bg-paper">
+  <div class="frame frame-lines">
+    <div class="rule grid gap-6 p-3 lg:grid-cols-[453px_1fr] lg:p-4">
+      <div class="photo aspect-[4/5] lg:aspect-auto lg:h-[560px]">
+        <img id="q-img" src="https://placehold.co/900x1120/png?text=Client+portrait" alt="Portrait of Priya N., COO at Harbor &amp; Vale Property Group" loading="lazy">
+        <div class="treat" aria-hidden="true"></div>
+        <div class="shade bg-gradient-to-t from-black/60 via-black/0 to-black/0" aria-hidden="true"></div>
+        <button type="button" class="play" aria-label="Play the 2-minute client story"><svg class="ic ic-sm translate-x-[1px]"><use href="#i-play"/></svg></button>
+        <p class="absolute bottom-4 left-4 z-[1] t-label text-paper/90">2-minute client story</p>
+      </div>
+      <div class="flex flex-col justify-between gap-10 px-3 py-8 text-center lg:px-6 lg:py-16">
+        <div id="q-panel" aria-live="polite">
+          <p id="q-brand" class="font-display text-[26px] font-semibold tracking-[-.03em] text-ember-deep">Harbor &amp; Vale</p>
+          <blockquote id="q-text" class="quote mx-auto mt-6 max-w-[820px]">“Our onboarding used to take four people and two days. Now it takes eleven minutes and nobody touches it.”</blockquote>
+          <p class="t-small mt-6"><span id="q-name" class="font-semibold">Priya N.</span> <span class="text-graphite">–</span> <span id="q-role" class="font-normal text-graphite">COO, Harbor &amp; Vale Property Group</span></p>
+          <a href="#audit" class="btn btn-secondary btn-sm mt-6">Read the full story <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+        </div>
+        <div class="qtabs" role="tablist" aria-label="Client stories" id="qtabs"></div>
+      </div>
+    </div>
+    <div class="rule grid sm:grid-cols-3">
+      <div class="flex items-center justify-center gap-2 border-b border-fog py-8 sm:border-b-0 sm:border-r">
+        <svg class="laurel h-14 w-9" aria-hidden="true"><use href="#i-laurel"/></svg>
+        <div class="text-center"><svg class="mx-auto h-7 w-7 text-ink" aria-hidden="true"><use href="#mark"/></svg><p class="t-label mt-1">140+ workflows</p><p class="t-label text-graphite">in production</p></div>
+        <svg class="laurel h-14 w-9 -scale-x-100" aria-hidden="true"><use href="#i-laurel"/></svg>
+      </div>
+      <div class="flex items-center justify-center gap-2 border-b border-fog py-8 sm:border-b-0 sm:border-r">
+        <svg class="laurel h-14 w-9" aria-hidden="true"><use href="#i-laurel"/></svg>
+        <div class="text-center"><svg class="mx-auto h-7 w-7 text-ink" aria-hidden="true"><use href="#mark"/></svg><p class="t-label mt-1">31,000 hours</p><p class="t-label text-graphite">saved per year</p></div>
+        <svg class="laurel h-14 w-9 -scale-x-100" aria-hidden="true"><use href="#i-laurel"/></svg>
+      </div>
+      <div class="flex items-center justify-center gap-2 py-8">
+        <svg class="laurel h-14 w-9" aria-hidden="true"><use href="#i-laurel"/></svg>
+        <div class="text-center"><svg class="mx-auto h-7 w-7 text-ink" aria-hidden="true"><use href="#mark"/></svg><p class="t-label mt-1">99.4% runs</p><p class="t-label text-graphite">succeed unattended</p></div>
+        <svg class="laurel h-14 w-9 -scale-x-100" aria-hidden="true"><use href="#i-laurel"/></svg>
+      </div>
+    </div>
+    <div class="rule h-12 lg:h-20"></div>
+  </div>
+</section>
+
+<!-- ============ NIGHT: AUDIT / BUSINESS CASE ============ -->
+<section id="audit" class="night scroll-mt-16" aria-labelledby="audit-h">
+  <div class="frame frame-lines">
+    <div class="dots" aria-hidden="true"></div>
+    <div class="rule-dark grid grid-cols-1 lg:grid-cols-2">
+      <div class="flex items-center px-6 py-14 lg:border-r lg:border-paper/10 lg:px-20">
+        <div class="min-w-0 w-full">
+          <p class="flex items-center gap-2 t-label text-paper/80"><i class="h-2 w-2 rounded-full bg-ember"></i>Automation Audit</p>
+          <h2 id="audit-h" class="t-h2 mt-5 max-w-[420px] text-ember-tint">The business case comes first</h2>
+          <p class="t-body mt-3 max-w-[500px] text-paper/75">Two weeks with your ops team. You get a ranked map of every task worth automating, the hours each one saves and how fast it pays back. Then you decide what we build.</p>
+          <a href="#book" class="btn btn-paper mt-6">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+          <div class="anim-scope mt-10 grid max-w-[512px] grid-cols-3">
+            <div class="stat seq"><p class="font-display text-[34px] leading-[40px] tracking-[-.03em] lg:text-[44px] lg:leading-[48px]">$2.5<span class="text-[22px]">K</span></p><p class="mt-1 text-[12px] leading-[16px] text-paper/70 lg:text-[13px]">fixed price</p></div>
+            <div class="stat seq"><p class="font-display text-[34px] leading-[40px] tracking-[-.03em] lg:text-[44px] lg:leading-[48px]">2<span class="text-[22px]"> wks</span></p><p class="mt-1 text-[12px] leading-[16px] text-paper/70 lg:text-[13px]">to your ranked map</p></div>
+            <div class="stat seq"><p class="font-display text-[34px] leading-[40px] tracking-[-.03em] lg:text-[44px] lg:leading-[48px]">3<span class="text-[22px]"> wks</span></p><p class="mt-1 text-[12px] leading-[16px] text-paper/70 lg:text-[13px]">to first live automation</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="p-3 lg:p-4">
+        <div class="panel anim-scope !min-h-[460px] lg:!min-h-[600px]" style="background:radial-gradient(60% 55% at 100% 100%,rgba(255,91,46,.45),transparent 70%),radial-gradient(60% 60% at 0% 0%,rgba(255,227,217,.18),transparent 70%),#4A2214">
+          <div class="seq pop relative z-[1] aspect-[3/4] w-[280px] rounded-[4px] bg-paper p-6 text-ink shadow-[-8px_0_0_-2px_rgba(246,244,238,.35),0_30px_60px_rgba(0,0,0,.45)] lg:w-[300px]">
+            <svg class="h-7 w-7 text-ink" aria-hidden="true"><use href="#mark"/></svg>
+            <p class="t-label mt-8 text-graphite">Automation Audit</p>
+            <p class="font-display mt-2 text-[24px] font-semibold leading-[28px] tracking-[-.02em]">Harbor &amp; Vale Property Group</p>
+            <p class="mt-2 text-[12px] leading-[18px] text-graphite">Ranked automation map · 23 opportunities · 1,940 hours a year</p>
+            <ul class="mt-6 space-y-2 text-[11px]">
+              <li class="seq flex items-center justify-between border-t border-fog pt-2"><span>1. Tenant onboarding</span><span class="font-mono">640 h</span></li>
+              <li class="seq flex items-center justify-between border-t border-fog pt-2"><span>2. Maintenance triage</span><span class="font-mono">410 h</span></li>
+              <li class="seq flex items-center justify-between border-t border-fog pt-2"><span>3. Rent arrears chasing</span><span class="font-mono">280 h</span></li>
+              <li class="seq flex items-center justify-between border-t border-fog pt-2 text-graphite"><span>4. Owner statements</span><span class="font-mono">190 h</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="dots rule-dark" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- ============ RESOURCES ============ -->
+<section id="resources" aria-label="Next steps" class="bg-paper">
+  <div class="frame frame-lines">
+    <div class="h-12 lg:h-20"></div>
+    <div class="rule grid md:grid-cols-3">
+      <div class="border-b border-fog px-6 py-7 md:border-b-0 md:border-r lg:px-4">
+        <h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-headset"/></svg>Talk to an engineer</h3>
+        <p class="t-small muted mt-2 !font-normal md:pl-8">Thirty minutes with the person who would build it. No sales deck.</p>
+        <a href="#book" class="btn btn-secondary btn-sm mt-4 md:ml-8">Book a call <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="border-b border-fog px-6 py-7 md:border-b-0 md:border-r lg:px-4">
+        <h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-book"/></svg>Read the playbooks</h3>
+        <p class="t-small muted mt-2 !font-normal md:pl-8">Teardowns of real workflows: triggers, edge cases and running costs.</p>
+        <a href="#" class="btn btn-secondary btn-sm mt-4 md:ml-8">Browse playbooks <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      </div>
+      <div class="px-6 py-7 lg:px-4">
+        <h3 class="flex items-center gap-3 text-[18px] font-semibold"><svg class="ic why-ic"><use href="#i-activity"/></svg>Keep it running</h3>
+        <p class="t-small muted mt-2 !font-normal md:pl-8">Managed automations from $1,500 a month: monitoring, fixes and monthly improvements.</p>
+        <a href="#" class="btn btn-secondary btn-sm mt-4 md:ml-8">See Run plans <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      </div>
+    </div>
+    <div class="rule h-12 lg:h-20"></div>
+  </div>
+</section>
+
+<!-- ============ CLOSING CTA ============ -->
+<section id="book" class="closing grain" aria-labelledby="close-h">
+  <div class="closing-glow" aria-hidden="true"></div>
+  <div class="relative px-6 pb-24 pt-28 text-center lg:pb-40 lg:pt-48">
+    <h2 id="close-h" class="t-h1 mx-auto max-w-[820px] lg:text-[60px] lg:leading-[64px]">Your team has better things to do. Get your hours back.</h2>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <a href="#audit" class="btn btn-primary">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      <a href="#workflows" class="btn btn-secondary">See what we'd automate <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+
+  <!-- ============ FOOTER ============ -->
+  <footer class="relative px-2 pb-2 sm:px-4 sm:pb-4">
+    <div class="footer-panel px-6 pb-8 pt-16 sm:px-10 lg:pt-24">
+      <div class="relative z-[1] grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <p class="f-head">Services</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#audit">Automation Audit <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#workflows">Build <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#resources">Run <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+          <a class="f-pill mt-5" href="#audit">Pricing <svg class="ic ic-xs"><use href="#i-chev"/></svg></a>
+          <p class="f-head mt-10">Workflows</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#lead">Lead intake <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#invoicing">Invoicing <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#onboarding">Onboarding <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#reporting">Reporting <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#triage">Inbox triage <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="f-head">Industries</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#">Agencies <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Logistics <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Clinics <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Property management <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Professional services <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+          <p class="f-head mt-10">Team size</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#">10–50 staff <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">50–200 staff <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="f-head">Resources</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#">Playbooks <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#stories">Client stories <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#runbooks">Sample runbook <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Workflow teardowns <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Blog <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+          <p class="f-head mt-10">Company</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#">About <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Careers <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#book">Contact <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Client login <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="f-head">We build on</p>
+          <ul class="mt-5 space-y-3">
+            <li><a class="f-link" href="#">n8n <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Make <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Zapier <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">OpenAI and Anthropic APIs <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Airtable <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">HubSpot <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Slack <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+            <li><a class="f-link" href="#">Google Workspace <svg class="ic ic-xs"><use href="#i-chev"/></svg></a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="relative z-[1] mt-16 flex flex-col gap-6 lg:mt-24 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <svg viewBox="0 0 292 64" width="146" height="32" role="img" aria-label="Loopwright">
+            <path d="M50.71 28.70 A19 19 0 1 1 35.30 13.29" fill="none" stroke="#F6F4EE" stroke-width="7" stroke-linecap="round"/>
+            <circle cx="45.44" cy="18.56" r="4" fill="#FF5B2E"/>
+            <text x="76" y="43" font-family="'Space Grotesk', Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="-1.2" fill="#F6F4EE">loopwright</text>
+          </svg>
+          <div class="mt-3 flex gap-1">
+            <a class="social" href="#" aria-label="Loopwright on LinkedIn"><svg class="ic ic-sm"><use href="#i-linkedin"/></svg></a>
+            <a class="social" href="#" aria-label="Loopwright on YouTube"><svg class="ic ic-sm"><use href="#i-youtube"/></svg></a>
+            <a class="social" href="#" aria-label="Loopwright on GitHub"><svg class="ic ic-sm"><use href="#i-github"/></svg></a>
+          </div>
+          <p class="mt-2 text-[13px] text-paper/70">© 2026 Loopwright. Remote-first, HQ in Austin, TX.</p>
+        </div>
+        <ul class="flex flex-wrap gap-x-5 gap-y-2">
+          <li><a class="f-link" href="#">Privacy</a></li>
+          <li><a class="f-link" href="#">Terms</a></li>
+          <li><a class="f-link" href="#">Security</a></li>
+          <li><a class="f-link" href="#">Data processing</a></li>
+        </ul>
+      </div>
+    </div>
+  </footer>
+</section>
+</main>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const icon = (id, cls = 'ic ic-sm') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
+  const pill = s => `<span class="pill ${s === 'Running' ? 'pill-run' : s === 'New' ? 'pill-new' : 'pill-queue'}">${s}</span>`;
+
+  /* ---------- hero mockup ---------- */
+  const flows = [
+    { label:'Lead intake', icon:'i-user-plus', client:'Northline Freight', file:'workflows/lead-intake.v4',
+      ask:'Every new enquiry gets a reply within two minutes. Dental and clinic leads go to Sam, everything else to Jo.',
+      status:'Watching 3 inboxes and 2 web forms…',
+      runs:[['FD','Fernhill Dental','routed to Sam'],['KB','Kirby Builders','reply drafted'],['AL','Atlas Logistics','scored 82'],['MH','Moss Hill Vets','routed to Sam'],['PG','Pryce Group','awaiting reply'],['OC','Oak & Cole','scored 64'],['TW','Tidewater Co.','routed to Jo']],
+      steps:[['Form or email arrives','Trigger','i-inbox','Running'],['Enrich company and score fit','Agent','i-sparkle','Running'],['Route to the right owner','HubSpot','i-branch','Running'],['Draft first reply for approval','Human check','i-check','Queued']],
+      stat:['1m 48s','median time to first reply'] },
+    { label:'Invoicing', icon:'i-receipt', client:'Fieldhouse Studio', file:'workflows/invoice-chaser.v3',
+      ask:'Chase every invoice more than 7 days overdue. Anything over $5,000 or disputed comes to me first.',
+      status:'Checking 312 open invoices…',
+      runs:[['BR','INV-2041 · Brightmark','2nd reminder'],['KC','INV-2038 · Kestrel & Co','paid today'],['PG','INV-2033 · Pryce Group','to finance lead'],['TW','INV-2029 · Tidewater','1st reminder'],['OC','INV-2027 · Oak & Cole','paid today'],['AL','INV-2019 · Atlas','3rd reminder'],['NF','INV-2012 · Northline','disputed']],
+      steps:[['Invoice passes due date','Xero','i-calendar','Running'],['Write reminder in your tone','Agent','i-sparkle','Running'],['Over $5K or disputed?','Rule','i-branch','Running'],['Send to finance lead in Slack','Human check','i-hash','Queued']],
+      stat:['−64%','overdue balance in 8 weeks'] },
+    { label:'Onboarding', icon:'i-clipboard', client:'Harbor & Vale', file:'workflows/client-onboarding.v6',
+      ask:'When a deal closes, set up the client, send the welcome pack and book kickoff. Send me one summary.',
+      status:'Deal closed: Oak & Cole Lettings…',
+      runs:[['OC','Oak & Cole Lettings','in progress'],['RL','Riverside Lets','completed · 9m'],['HP','Hale Partners','completed · 12m'],['SW','Southwark Homes','completed · 11m'],['BG','Barrow Group','completed · 10m'],['LM','Larch Mews','completed · 14m'],['QP','Quay Property','completed · 11m']],
+      steps:[['Contract countersigned','DocuSign','i-file','Running'],['Create workspace and logins','Google','i-layers','Running'],['Send welcome pack, book kickoff','Agent','i-sparkle','Running'],['Handover summary to account lead','Slack','i-hash','New']],
+      stat:['11 min','average onboarding time'] },
+    { label:'Reporting', icon:'i-chart', client:'Clearwater Clinics', file:'workflows/weekly-ops-report.v2',
+      ask:'Every Monday at 7am, send leadership the weekly numbers in plain English. Flag anything unusual.',
+      status:'Pulling from HubSpot, Xero and 4 sheets…',
+      runs:[['W46','Week 46 report','sent 07:00'],['W45','Week 45 report','sent 07:00'],['W44','Week 44 report','1 anomaly'],['W43','Week 43 report','sent 07:00'],['W42','Week 42 report','sent 07:00'],['W41','Week 41 report','2 anomalies'],['W40','Week 40 report','sent 07:00']],
+      steps:[['Monday, 06:30','Schedule','i-calendar','Running'],['Pull and reconcile numbers','Airtable','i-layers','Running'],['Write summary, note anomalies','Agent','i-sparkle','Running'],['Send to leadership','Email','i-mail','Queued']],
+      stat:['0','CSVs exported by hand'] },
+    { label:'Inbox triage', icon:'i-inbox', client:'Clearwater Clinics', file:'workflows/inbox-triage.v5',
+      ask:'Sort the shared inbox. Draft replies to routine questions. Anything urgent goes straight to the front desk channel.',
+      status:'Reading 47 new emails…',
+      runs:[['AT','Ana T. · billing','reply drafted'],['RM','R. Mensah · urgent','flagged in Slack'],['JP','J. Park · booking','reply drafted'],['SV','Supplier · statement','filed'],['KL','K. Lowe · booking','reply sent'],['DM','D. Moore · records','to practice lead'],['NB','Newsletter','archived']],
+      steps:[['New email arrives','Gmail','i-mail','Running'],['Label and route','Agent','i-sparkle','Running'],['Draft reply in your voice','Agent','i-msg','Running'],['One-click approval','Human check','i-check','Queued']],
+      stat:['47','emails sorted before 9am'] }
+  ];
+  const tabsEl = $('#mock-tabs'), bodyEl = $('#mock-body');
+  tabsEl.innerHTML = flows.map((f, i) => `<button type="button" role="tab" class="mtab t-small" id="mt-${i}" aria-selected="${i===0}" tabindex="${i===0?0:-1}">${icon(f.icon)}${esc(f.label)}<span class="prog" aria-hidden="true"></span></button>`).join('');
+  function renderFlow(i){
+    const f = flows[i];
+    bodyEl.setAttribute('aria-labelledby', 'mt-' + i);
+    bodyEl.innerHTML = `
+      <div class="mcol flex flex-col justify-between gap-6 p-4">
+        <div class="space-y-4">
+          <div class="bubble enter" style="--i:0">${esc(f.ask)}</div>
+          <p class="thinking enter" style="--i:2"><span class="dotp"></span>${esc(f.status)}</p>
+          <div class="enter-pop rounded-[12px] p-3 shadow-[inset_0_0_0_1px_#E4E1D8]" style="--i:4">
+            <p class="font-display text-[28px] font-semibold leading-[32px] tracking-[-.03em]">${esc(f.stat[0])}</p>
+            <p class="text-[13px] text-graphite">${esc(f.stat[1])}</p>
+          </div>
+        </div>
+        <div class="composer flex h-[88px] flex-col justify-between"><span>Ask about this workflow…</span><span class="flex justify-between text-graphite">${icon('i-plus')}${icon('i-up')}</span></div>
+      </div>
+      <div class="mcol hidden min-[1100px]:block">
+        <p class="truncate border-b border-fog px-4 py-3 text-[12px] text-graphite">${esc(f.client)} <span class="mx-1">/</span> <span class="text-ink">${esc(f.label)}</span></p>
+        <ul>${f.runs.map((r, k) => `<li class="run enter" style="--i:${k + 1}"><span class="flex min-w-0 items-center gap-[10px]" style="opacity:${Math.max(.25, 1 - k * .12)}"><span class="avatar">${esc(r[0])}</span><span class="min-w-0"><span class="block truncate font-medium">${esc(r[1])}</span><span class="block truncate text-graphite">${esc(r[2])}</span></span></span></li>`).join('')}</ul>
+      </div>
+      <div class="mcol hidden md:flex md:flex-col">
+        <div class="flex items-center gap-3 border-b border-fog px-4 py-2.5">
+          <span class="flex flex-1 items-center gap-2 truncate rounded-[6px] bg-[#F3F1EC] px-3 py-1.5 font-mono text-[12px] text-graphite">${icon('i-file','ic ic-xs')}${esc(f.file)}</span>
+          <span class="flex items-center gap-1.5 rounded-[6px] px-2.5 py-1.5 text-[12px] font-medium shadow-[inset_0_0_0_1px_#E4E1D8]">${icon('i-book','ic ic-xs')}Runbook</span>
+        </div>
+        <div class="dotgrid flex flex-1 flex-col items-center justify-center px-6 py-10">
+          ${f.steps.map((s, k) => `${k ? `<div class="connector enter ${s[3] === 'Queued' || s[3] === 'New' ? 'dashed' : ''}" style="--i:${k * 2 + 2}"></div>` : ''}
+            <div class="step enter-pop" style="--i:${k * 2 + 3}"><span class="step-ic">${icon(s[2])}</span><span class="min-w-0 flex-1"><span class="block truncate text-[14px] font-medium">${esc(s[0])}</span><span class="t-label block !text-[11px] text-graphite">${esc(s[1])}</span></span>${pill(s[3])}</div>`).join('')}
+        </div>
+      </div>`;
+  }
+  function selectTab(i, focus){
+    tabsEl.querySelectorAll('.mtab').forEach((t, k) => { t.setAttribute('aria-selected', k === i); t.tabIndex = k === i ? 0 : -1; });
+    if (focus) tabsEl.children[i].focus();
+    renderFlow(i);
+  }
+  tabsEl.addEventListener('click', e => { const t = e.target.closest('.mtab'); if (t) selectTab([...tabsEl.children].indexOf(t)); });
+  tabsEl.addEventListener('keydown', e => {
+    const cur = [...tabsEl.children].findIndex(t => t.getAttribute('aria-selected') === 'true');
+    if (e.key === 'ArrowRight') { e.preventDefault(); selectTab((cur + 1) % flows.length, true); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); selectTab((cur - 1 + flows.length) % flows.length, true); }
+  });
+  renderFlow(0);
+
+  /* ---------- motion ---------- */
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Hero mockup: tabs auto-advance every 10s (Ember progress bar is the clock).
+  // Pauses on hover/focus or when off-screen; stops for good once someone picks a tab.
+  const mock = $('#mock');
+  const stopAuto = () => mock.classList.remove('auto');
+  if (!reduced) mock.classList.add('auto');
+  tabsEl.addEventListener('animationend', e => {
+    if (e.animationName !== 'tabProg' || !mock.classList.contains('auto')) return;
+    const cur = [...tabsEl.children].findIndex(t => t.getAttribute('aria-selected') === 'true');
+    selectTab((cur + 1) % flows.length);
+  });
+  tabsEl.addEventListener('click', stopAuto);
+  tabsEl.addEventListener('keydown', e => { if (e.key.startsWith('Arrow')) stopAuto(); });
+  mock.addEventListener('mouseenter', () => mock.classList.add('hold'));
+  mock.addEventListener('mouseleave', () => mock.classList.remove('hold'));
+  mock.addEventListener('focusin', () => mock.classList.add('hold'));
+  mock.addEventListener('focusout', e => { if (!mock.contains(e.relatedTarget)) mock.classList.remove('hold'); });
+  new IntersectionObserver(([en]) => mock.classList.toggle('off', !en.isIntersecting)).observe(mock);
+
+  // Stagger order for in-view sequences (charts draw, cards pop, rows enter).
+  document.querySelectorAll('.anim-scope').forEach(scope => {
+    let i = 0;
+    scope.querySelectorAll('.seq, .draw-path').forEach(el => {
+      if (!el.style.getPropertyValue('--i')) el.style.setProperty('--i', Math.min(i, 12));
+      i++;
+    });
+  });
+
+  // Scroll reveals: fade up 10px, siblings staggered 80ms.
+  const revealSel = ['.wrow > *', '.dark .rule-dark > *', '.night .rule-dark > *', '.rule.flex', '.rule.grid > div', '#close-h', '#close-h + div'];
+  const perParent = new Map();
+  document.querySelectorAll(revealSel.join(',')).forEach(el => {
+    const n = perParent.get(el.parentNode) || 0;
+    perParent.set(el.parentNode, n + 1);
+    el.classList.add('reveal');
+    el.style.transitionDelay = n * 80 + 'ms';
+  });
+  const inView = new IntersectionObserver(entries => entries.forEach(en => {
+    if (!en.isIntersecting) return;
+    en.target.classList.add('in');
+    inView.unobserve(en.target);
+  }), { threshold: .15, rootMargin: '0px 0px -6% 0px' });
+  document.querySelectorAll('.reveal, .anim-scope').forEach(el => inView.observe(el));
+
+  // Hero copy eases back as you scroll past it.
+  const heroCopy = $('#hero-copy');
+  if (!reduced && heroCopy) {
+    let ticking = false;
+    addEventListener('scroll', () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const p = Math.min(scrollY / 520, 1);
+        heroCopy.style.opacity = 1 - p * .6;
+        heroCopy.style.transform = `translateY(${p * 28}px)`;
+        ticking = false;
+      });
+    }, { passive: true });
+  }
+
+  /* ---------- testimonials ---------- */
+  const quotes = [
+    { brand:'Harbor & Vale', text:'Our onboarding used to take four people and two days. Now it takes eleven minutes and nobody touches it.', name:'Priya N.', role:'COO, Harbor & Vale Property Group', img:'https://placehold.co/900x1120/png?text=Client+portrait' },
+    { brand:'Northline Freight', text:'Quote requests used to sit overnight. Now every one gets a price back in under ten minutes, even at 2am.', name:'Marcus O.', role:'Head of Operations, Northline Freight', img:'https://placehold.co/900x1120/png?text=Client+portrait+2' },
+    { brand:'Clearwater Clinics', text:'Our front desk spent every morning in the inbox. Now they spend it with patients.', name:'Dana R.', role:'Practice Director, Clearwater Clinics', img:'https://placehold.co/900x1120/png?text=Client+portrait+3' },
+    { brand:'Fieldhouse Studio', text:'Month-end used to take three people and a lot of coffee. The report is in my inbox at 7am on the first.', name:'Tom W.', role:'Founder, Fieldhouse Studio', img:'https://placehold.co/900x1120/png?text=Client+portrait+4' }
+  ];
+  const qtabs = $('#qtabs');
+  qtabs.innerHTML = quotes.map((q, i) => `<button type="button" role="tab" class="qtab" aria-selected="${i===0}" tabindex="${i===0?0:-1}">${esc(q.brand)}</button>`).join('');
+  function selectQuote(i, focus){
+    const q = quotes[i];
+    qtabs.querySelectorAll('.qtab').forEach((t, k) => { t.setAttribute('aria-selected', k === i); t.tabIndex = k === i ? 0 : -1; });
+    if (focus) qtabs.children[i].focus();
+    $('#q-brand').textContent = q.brand;
+    $('#q-text').textContent = `“${q.text}”`;
+    $('#q-name').textContent = q.name;
+    $('#q-role').textContent = q.role;
+    const img = $('#q-img'); img.src = q.img; img.alt = `Portrait of ${q.name}, ${q.role}`;
+    const p = $('#q-panel'); p.classList.remove('swap'); void p.offsetWidth; p.classList.add('swap');
+  }
+  qtabs.addEventListener('click', e => { const t = e.target.closest('.qtab'); if (t) selectQuote([...qtabs.children].indexOf(t)); });
+  qtabs.addEventListener('keydown', e => {
+    const cur = [...qtabs.children].findIndex(t => t.getAttribute('aria-selected') === 'true');
+    if (e.key === 'ArrowRight') { e.preventDefault(); selectQuote((cur + 1) % quotes.length, true); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); selectQuote((cur - 1 + quotes.length) % quotes.length, true); }
+  });
+
+  /* ---------- marquee: duplicate the set for a seamless loop ---------- */
+  const set = $('#wm-set'); const clone = set.cloneNode(true); clone.removeAttribute('id'); clone.setAttribute('aria-hidden', 'true'); set.parentNode.appendChild(clone);
+
+  /* ---------- sticky rail follows the workflow rows ---------- */
+  const railLinks = [...document.querySelectorAll('#rail a')];
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(en => { if (en.isIntersecting) railLinks.forEach(a => a.classList.toggle('active', a.dataset.for === en.target.id)); });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('.wrow').forEach(r => io.observe(r));
+
+  /* ---------- nav dropdowns (click/keyboard) ---------- */
+  document.querySelectorAll('.dd').forEach(dd => {
+    const b = dd.querySelector('button');
+    b.addEventListener('click', () => { const o = dd.classList.toggle('open'); b.setAttribute('aria-expanded', o); });
+    dd.addEventListener('focusout', e => { if (!dd.contains(e.relatedTarget)) { dd.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); } });
+    dd.addEventListener('keydown', e => { if (e.key === 'Escape') { dd.classList.remove('open'); b.setAttribute('aria-expanded', 'false'); b.focus(); } });
+  });
+
+  /* ---------- mobile menu ---------- */
+  const mb = $('#menu-btn'), mm = $('#mobile-menu');
+  mb.addEventListener('click', () => {
+    const open = mm.classList.toggle('hidden') === false;
+    mb.setAttribute('aria-expanded', open);
+    mb.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    mb.querySelector('use').setAttribute('href', open ? '#i-x' : '#i-menu');
+  });
+  mm.addEventListener('click', e => { if (e.target.closest('a')) { mm.classList.add('hidden'); mb.setAttribute('aria-expanded', 'false'); mb.querySelector('use').setAttribute('href', '#i-menu'); } });
+})();
+</script>
+</body>
+</html>

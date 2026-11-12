@@ -1,0 +1,13 @@
+# Local screenshot output
+temporary screenshots/
+
+# Old page version, kept locally only
+index-v1-backup.html
+
+# Dependencies and OS/editor clutter
+node_modules/
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.log

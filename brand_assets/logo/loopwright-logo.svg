@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 292 64" width="292" height="64" role="img" aria-label="Loopwright">
+  <!-- Wordmark uses Space Grotesk 600. Load the font on the page (Google Fonts) or outline the text in a vector tool for print. -->
+  <path d="M50.71 28.70 A19 19 0 1 1 35.30 13.29" fill="none" stroke="#12141C" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="45.44" cy="18.56" r="4" fill="#FF5B2E"/>
+  <text x="76" y="43" font-family="'Space Grotesk', 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="600" letter-spacing="-1.2" fill="#12141C">loopwright</text>
+</svg>
