@@ -70,6 +70,13 @@
     .btn:focus-visible{outline:2px solid var(--ember-deep);outline-offset:3px}
     .btn-sm{padding:9px 14px;font-size:14px;gap:6px}
     .btn-primary{background:var(--ember);color:var(--ink)}
+    /* Glowing primary CTA: Ember halo that breathes slowly, brighter on hover/focus */
+    .btn-glow{--glow-lo:.45;--glow-hi:.9}
+    .btn-glow::after{content:"";position:absolute;inset:0;z-index:-2;border-radius:inherit;pointer-events:none;
+      box-shadow:0 0 18px 4px rgba(255,91,46,.55),0 0 44px 10px rgba(255,91,46,.28),0 0 80px 18px rgba(255,140,100,.14);
+      animation:ctaGlow 3.2s ease-in-out infinite}
+    .btn-glow:hover,.btn-glow:focus-visible{--glow-lo:.85;--glow-hi:1}
+    @keyframes ctaGlow{0%,100%{opacity:var(--glow-lo);transform:scale(.97)}50%{opacity:var(--glow-hi);transform:scale(1)}}
     .btn-secondary{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
     .btn-ink{background:var(--ink);color:var(--paper)}
     .btn-ink::before{background:var(--paper)}
@@ -311,6 +318,7 @@
     @media (prefers-reduced-motion:reduce){
       *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;transition-delay:0s!important}
       .marquee-track,.panel::before{animation:none}
+      .btn-glow::after{animation:none;opacity:.7}
       html.js .reveal,html.js .anim-scope .seq{opacity:1!important;transform:none!important}
       html.js .draw-path{stroke-dashoffset:0!important}
       html{scroll-behavior:auto}
@@ -421,7 +429,7 @@
     <a class="dd-item" href="#workflows"><b>Workflows</b><span>Lead intake, invoicing, onboarding, reporting, inbox triage</span></a>
     <a class="dd-item" href="#stories"><b>Client stories</b></a>
     <a class="dd-item" href="#resources"><b>Resources</b></a>
-    <a href="#audit" class="btn btn-primary mt-4 w-full">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+    <a href="#audit" class="btn btn-primary btn-glow mt-4 w-full">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
   </nav>
 </header>
 
@@ -437,7 +445,7 @@
     <h1 class="t-display max-w-[620px]">Work that<br class="hidden sm:inline"> runs itself.</h1>
     <p class="t-lead muted mt-5 max-w-[560px]">We design, build and run AI agents and workflow automations for operations teams, so the repetitive work happens without anyone touching it.</p>
     <div class="mt-8 flex flex-wrap gap-3">
-      <a href="#audit" class="btn btn-primary">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      <a href="#audit" class="btn btn-primary btn-glow">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
       <a href="#workflows" class="btn btn-secondary">See what we'd automate <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
     </div>
   </div>
@@ -841,7 +849,7 @@
   <div class="relative px-6 pb-24 pt-28 text-center lg:pb-40 lg:pt-48">
     <h2 id="close-h" class="t-h1 mx-auto max-w-[820px] lg:text-[60px] lg:leading-[64px]">Your team has better things to do. Get your hours back.</h2>
     <div class="mt-8 flex flex-wrap justify-center gap-3">
-      <a href="#audit" class="btn btn-primary">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
+      <a href="#audit" class="btn btn-primary btn-glow">Book an automation audit <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
       <a href="#workflows" class="btn btn-secondary">See what we'd automate <svg class="ic ic-sm arr"><use href="#i-arrow"/></svg></a>
     </div>
   </div>
